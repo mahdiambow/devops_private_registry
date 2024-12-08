@@ -26,7 +26,13 @@
 
 3 . Add Docker's Official GPG Key :
 
-    `curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg`
+## Adding Docker's Official GPG Key
+
+Run the following command to add Docker's GPG key:
+
+```bash
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+```
 
 4 . Add Docker Repository :
 
