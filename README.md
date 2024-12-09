@@ -77,8 +77,6 @@ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o 
 ## Step 3: Create `docker-compose.yaml` File
 
 ```plaintext
-version: '3.3'
-
 services:
   nexus:
     image: sonatype/nexus3:latest
@@ -98,10 +96,9 @@ services:
     container_name: nginx
     ports:
       - "80:80"
-      - "443:443
     volumes:
       - ./registry.conf:/etc/nginx/conf.d/registry.conf
-      - ./certs/:/etc/ssl/
+      - ./certs:/etc/ssl/
     networks:
       - nexus-network
 
@@ -113,34 +110,77 @@ networks:
   nexus-network:
     driver: bridge
 
+
 ```
 
 ## Step 4: Create SSL Certification
 
-1 . Install Certbot :
+1 . Create an OpenSSL Configuration File :
 
-`sudo apt update`
+`openssl.cnf` :
 
-`sudo apt install certbot
-`
+```plaintext
+[ req ]
+default_bits = 2048
+default_keyfile = privkey.pem
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+prompt = no
+
+[ req_distinguished_name ]
+C = US
+ST = State
+L = City
+O = Your Organization
+OU = Your Organizational Unit
+CN = registry.example.com
+
+[ v3_req ]
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[ alt_names ]
+DNS.1 = registry.example.com
+
+
+```
 
 2 . Generate SSL Certificates :
 
-`sudo certbot certonly --standalone -d registry.exampale.ir
-`
+```plaintext
+
+
+openssl genpkey -algorithm RSA -out privkey.pem
+
+request (CSR)
+openssl req -new -key privkey.pem -out cert.csr -config openssl.cnf
+
+openssl x509 -req -in cert.csr -signkey privkey.pem -out fullchain.pem -days 365 -extensions v3_req -extfile openssl.cnf
+
+
+```
 
 3 . Locate Generated Certificates:
 
-Certificate: `/etc/letsencrypt/live/registry.seyedmahdisheikh.ir/fullchain.pem`
+```plaintext
 
-Private Key: `/etc/letsencrypt/live/registry.seyedmahdisheikh.ir/privkey.pem`
+
+mkdir -p ./certs
+
+cp fullchain.pem ./certs/
+cp privkey.pem ./certs/
+
+
+
+```
 
 ## Step 5: Create `registry.conf` File
 
 ```plaintext
 server {
     listen 80;
-    server_name registry.seyedmahdisheikh.ir;
+    server_name registry.example.com;
 
     location / {
         return 301 https://$host$request_uri;
@@ -149,10 +189,10 @@ server {
 
 server {
     listen 443 ssl;
-    server_name registry.seyedmahdisheikh.ir;
+    server_name registry.example.com;
 
-    ssl_certificate /etc/letsencrypt/live/registry.seyedmahdisheikh.ir/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/registry.seyedmahdisheikh.ir/privkey.pem;
+    ssl_certificate /etc/ssl/fullchain.pem;
+    ssl_certificate_key /etc/ssl/privkey.pem;
 
     client_max_body_size 1G;
 
@@ -167,50 +207,56 @@ server {
 
 ```
 
-## Step 8: Start Docker Compose
+## Step 8: Setup `/etc/hosts`
+
+1 . Go to hosts
+
+`vi /etc/hosts`
+
+2 . Append This :
+
+```plaintext
+127.0.0.1   registry.example.com
+```
+
+## Step 9: Start Docker Compose
 
 `docker-compose down`
 
 `docker-compose up -d
 `
 
-## Step 9: Get The Password of Nexus :
+## Step 10: Get The Password of Nexus :
 
 `sudo docker exec -it nexus /bin/bash`
+
+you can see the pass word here :
 
 `cat /nexus-data/admin.password`
 
 Username : Admin
 
-<!-- You can either generate self-signed certificates (for testing purposes) or obtain a valid certificate from a trusted Certificate Authority (CA) like Let's Encrypt.
+## Step 11: After Login To Nexus :
 
-# Option 1: Generate a Self-Signed Certificate (for testing)
+1. Go to setting
+2. Go to repositories
+3. Click create repository
+4. Choose docker(hosted)
+5. Put http port on 5000
+6. Save it
 
-If you just need it for testing and don’t have a domain with a valid certificate, you can generate a self-signed SSL certificate:
+## Step 12: Push the Images :
 
-mkdir -p ./certs
-cd ./certs
+1. `docker login registry.example.com`
 
-# Generate a private key
+2. Tag The Docker Image :
 
-openssl genpkey -algorithm RSA -out private.key -pkeyopt rsa_keygen_bits:2048
+`docker tag nginx:latest registry.example.com/nginx:latest`
 
-# Generate a self-signed certificate (valid for 365 days)
+3 . Push Docker Image:
 
-openssl req -new -key private.key -out certificate.csr
+`docker push registry.example.com/nginx:latest`
 
-#
+4 . You Can Pull :
 
-openssl x509 -req -days 365 -in certificate.csr -signkey private.key -out certificate.crt
-
-sudo certbot certonly --standalone -d registry.sananetco.com
-
-sudo cp /etc/letsencrypt/live/registry.sananetco.com/fullchain.pem ./certs/certificate.crt
-
-sudo cp /etc/letsencrypt/live/registry.sananetco.com/privkey.pem ./certs/private.key
-
-chmod 644 ./certs/certificate.crt
-
-chmod 644 ./certs/private.key
-
-# -->
+`docker pull localhost:5000/[your-image]`
